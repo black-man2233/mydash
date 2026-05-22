@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MyDash.Application\MyDash.Application.csproj" />
+    <ProjectReference Include="..\MyDash.Infrastructure\MyDash.Infrastructure.csproj" />
+    <ProjectReference Include="..\MyDash.Contracts\MyDash.Contracts.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

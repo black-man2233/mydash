@@ -1,0 +1,41 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+.vs/
+_ReSharper*/
+*.DotSettings.user
+
+## NuGet
+*.nupkg
+project.lock.json
+project.assets.json
+packages/
+
+## Secrets
+**/appsettings.*.json
+!**/appsettings.Development.json
+**/secrets.json
+**/.env
+
+## Certs
+*.pfx
+*.pem
+*.key
+
+## Logs
+logs/
+*.log
+
+## SQLite
+*.db
+*.db-shm
+*.db-wal
+
+## Agent data
+/var/lib/mydash-agent/
+
+## OS
+.DS_Store
+Thumbs.db
