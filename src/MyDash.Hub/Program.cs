@@ -11,6 +11,7 @@ using MyDash.Infrastructure.GrpcServices;
 using MyDash.Infrastructure.Repositories;
 using MyDash.Infrastructure.Services;
 using MyDash.Infrastructure.Sms;
+using MudBlazor.Services;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -28,6 +29,7 @@ try
         .WriteTo.File("logs/hub-.log", rollingInterval: RollingInterval.Day));
 
     builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+    builder.Services.AddMudServices();
     builder.Services.AddGrpc();
 
     var connStr = builder.Configuration["Database:ConnectionString"]
@@ -95,7 +97,6 @@ try
     if (!app.Environment.IsDevelopment())
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
 
-    app.UseHttpsRedirection();
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
