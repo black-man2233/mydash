@@ -36,8 +36,8 @@ else
                       AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined"
                       Immediate="true" Class="flex-grow-1" />
         <MudToggleGroup T="string" @bind-Value="_viewMode" SelectionMode="SelectionMode.SingleSelection">
-            <MudToggleItem Value="@("cards")" Icon="@Icons.Material.Rounded.GridView" />
-            <MudToggleItem Value="@("table")" Icon="@Icons.Material.Rounded.TableRows" />
+            <MudToggleItem Value="@("cards")"><MudIcon Icon="@Icons.Material.Rounded.GridView" Size="Size.Small" /></MudToggleItem>
+            <MudToggleItem Value="@("table")"><MudIcon Icon="@Icons.Material.Rounded.TableRows" Size="Size.Small" /></MudToggleItem>
         </MudToggleGroup>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add"
                    OnClick="AddService">Add Service</MudButton>

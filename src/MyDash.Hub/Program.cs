@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using MyDash.Infrastructure.BackgroundServices;
 using Microsoft.EntityFrameworkCore;
 using MyDash.Application.Options;
 using MyDash.Application.Repositories;
@@ -83,6 +84,10 @@ try
     builder.Services.AddAuthorization();
     builder.Services.AddCascadingAuthenticationState();
     builder.Services.AddHttpContextAccessor();
+
+    builder.Services.AddHostedService<AgentHeartbeatWatchdog>();
+    builder.Services.AddHostedService<EnrollmentTokenJanitor>();
+    builder.Services.AddHostedService<PinChallengeJanitor>();
 
     var app = builder.Build();
 
