@@ -1,0 +1,23 @@
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Servers')
+BEGIN
+    CREATE TABLE [dbo].[Servers] (
+        [Id]               UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+        [Name]             NVARCHAR(128)    NOT NULL,
+        [FullName]         NVARCHAR(256)    NOT NULL DEFAULT '',
+        [TailscaleHost]    NVARCHAR(256)    NOT NULL DEFAULT '',
+        [Color]            NVARCHAR(32)     NOT NULL DEFAULT '#594AE2',
+        [InitialChar]      NVARCHAR(4)      NOT NULL DEFAULT '?',
+        [Tags]             NVARCHAR(1024)   NOT NULL DEFAULT '',
+        [OS]               NVARCHAR(128)    NOT NULL DEFAULT '',
+        [Status]           INT              NOT NULL DEFAULT 3,   -- 0=Up,1=Down,2=Degraded,3=Unknown
+        [AgentVersion]     NVARCHAR(64)     NOT NULL DEFAULT '',
+        [AgentFingerprint] NVARCHAR(256)    NOT NULL DEFAULT '',
+        [EnrolledAt]       DATETIMEOFFSET   NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+        [LastHeartbeat]    DATETIMEOFFSET   NULL,
+        [CpuPercent]       FLOAT            NOT NULL DEFAULT 0,
+        [MemPercent]       FLOAT            NOT NULL DEFAULT 0,
+        [DiskPercent]      FLOAT            NOT NULL DEFAULT 0,
+        [UptimeSeconds]    BIGINT           NOT NULL DEFAULT 0,
+        CONSTRAINT [PK_Servers] PRIMARY KEY ([Id])
+    );
+END
