@@ -6,7 +6,6 @@ using MyDash.Application.Repositories;
 using MyDash.Application.Services;
 using MyDash.Application.UseCases;
 using MyDash.Hub.Components;
-using Microsoft.EntityFrameworkCore;
 using MyDash.Infrastructure.Data;
 using MyDash.Infrastructure.GrpcServices;
 using MyDash.Infrastructure.Repositories;
