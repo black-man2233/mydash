@@ -1,0 +1,20 @@
+[
+  { "image": "plexinc/pms-docker", "name": "Plex", "glyph": "movie", "color": "#E5A00D", "tags": ["media"] },
+  { "image": "linuxserver/sonarr", "name": "Sonarr", "glyph": "tv", "color": "#35C5F4", "tags": ["media", "arr"] },
+  { "image": "linuxserver/radarr", "name": "Radarr", "glyph": "movie", "color": "#FFC130", "tags": ["media", "arr"] },
+  { "image": "linuxserver/lidarr", "name": "Lidarr", "glyph": "music_note", "color": "#00CCBE", "tags": ["media", "arr"] },
+  { "image": "linuxserver/prowlarr", "name": "Prowlarr", "glyph": "search", "color": "#FFC530", "tags": ["arr"] },
+  { "image": "homeassistant/home-assistant", "name": "Home Assistant", "glyph": "home", "color": "#03A9F4", "tags": ["home"] },
+  { "image": "pihole/pihole", "name": "Pi-hole", "glyph": "block", "color": "#96060C", "tags": ["network"] },
+  { "image": "nextcloud", "name": "Nextcloud", "glyph": "cloud", "color": "#0082C9", "tags": ["storage"] },
+  { "image": "gitea/gitea", "name": "Gitea", "glyph": "code", "color": "#609926", "tags": ["dev"] },
+  { "image": "portainer/portainer-ce", "name": "Portainer", "glyph": "inventory_2", "color": "#13BEF9", "tags": ["infra"] },
+  { "image": "grafana/grafana", "name": "Grafana", "glyph": "bar_chart", "color": "#F46800", "tags": ["monitoring"] },
+  { "image": "prom/prometheus", "name": "Prometheus", "glyph": "monitoring", "color": "#E6522C", "tags": ["monitoring"] },
+  { "image": "syncthing/syncthing", "name": "Syncthing", "glyph": "sync", "color": "#0891D1", "tags": ["storage"] },
+  { "image": "vaultwarden/server", "name": "Vaultwarden", "glyph": "lock", "color": "#175DDC", "tags": ["security"] },
+  { "image": "adguard/adguardhome", "name": "AdGuard Home", "glyph": "shield", "color": "#66B574", "tags": ["network"] },
+  { "image": "traefik", "name": "Traefik", "glyph": "swap_horiz", "color": "#24A1C1", "tags": ["network"] },
+  { "image": "nginx", "name": "Nginx", "glyph": "web", "color": "#009639", "tags": ["web"] },
+  { "image": "jellyfin/jellyfin", "name": "Jellyfin", "glyph": "play_circle", "color": "#9B59B6", "tags": ["media"] }
+]
