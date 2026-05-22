@@ -21,7 +21,7 @@ RUN dotnet restore src/MyDash.Hub/MyDash.Hub.csproj
 COPY src/ src/
 
 RUN dotnet publish src/MyDash.Hub/MyDash.Hub.csproj \
-    -c Release -o /app/publish --no-restore
+    -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app

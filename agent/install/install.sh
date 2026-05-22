@@ -32,10 +32,10 @@ done
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
-    x86_64)  RID="linux-x64"  ;;
-    aarch64) RID="linux-arm64" ;;
-    armv7l)  RID="linux-arm"  ;;
-    *)       echo "Unsupported arch: $ARCH"; exit 1 ;;
+    x86_64)          RID="linux-x64"   ;;
+    aarch64 | arm64) RID="linux-arm64" ;;
+    armv7l | armv6l) RID="linux-arm"   ;;
+    *)               echo "Unsupported arch: $ARCH"; exit 1 ;;
 esac
 
 BINARY_URL="https://github.com/user/mydash/releases/${VERSION}/download/mydash-agent-${RID}"
