@@ -1,0 +1,179 @@
+@page "/fleet"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IServerRepository Servers
+@inject IEnrollmentTokenRepository Tokens
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+
+<PageTitle>Fleet — MyDash</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-2">Fleet</MudText>
+
+<MudTabs Elevation="0">
+    <MudTabPanel Text="Enrolled Agents">
+        <MudTable Items="_servers" Hover="true" Dense="true" Class="mt-3">
+            <HeaderContent>
+                <MudTh>Server</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>OS</MudTh>
+                <MudTh>Version</MudTh>
+                <MudTh>Last Heartbeat</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudAvatar Size="Size.Small" Style="@($"background:{context.Color};")">@context.InitialChar</MudAvatar>
+                        <MudLink Href="@($"/server/{context.Id}")">@context.Name</MudLink>
+                    </MudStack>
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@StatusColor(context.Status)">@context.Status</MudChip>
+                </MudTd>
+                <MudTd>@context.OS</MudTd>
+                <MudTd Style="font-family:'JetBrains Mono',monospace;font-size:0.8rem">@context.AgentVersion</MudTd>
+                <MudTd Style="font-family:'JetBrains Mono',monospace;font-size:0.8rem">
+                    @(context.LastHeartbeat.HasValue ? context.LastHeartbeat.Value.ToString("HH:mm:ss") : "never")
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Rounded.Delete" Size="Size.Small"
+                                   Color="Color.Error" OnClick="@(() => RevokeAgent(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4" Color="Color.Secondary">No agents enrolled yet.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Enrollment Tokens">
+        <MudStack Row="true" JustifyContent="JustifyContent.FlexEnd" Class="mt-3 mb-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add"
+                       OnClick="OpenConnectWizard">Connect Server</MudButton>
+        </MudStack>
+
+        <MudTable Items="_tokens" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Server Name</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh>Expires</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ServerName</MudTd>
+                <MudTd Style="font-family:'JetBrains Mono',monospace;font-size:0.8rem">@context.CreatedAt.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd Style="font-family:'JetBrains Mono',monospace;font-size:0.8rem">@context.ExpiresAt.ToString("MM/dd HH:mm")</MudTd>
+                <MudTd>
+                    @if (context.IsConsumed)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Consumed</MudChip>
+                    }
+                    else if (context.IsExpired)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">Expired</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">Pending</MudChip>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Rounded.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(() => RevokeToken(context))" Disabled="context.IsConsumed || context.IsRevoked" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4" Color="Color.Secondary">No pending enrollment tokens.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Agent Downloads">
+        <MudGrid Class="mt-3">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.subtitle1">Linux / macOS</MudText>
+                    <MudText Typo="Typo.body2" Class="mb-2">One-line install:</MudText>
+                    <MudTextField Value="@_linuxInstall" ReadOnly="true" Variant="Variant.Outlined"
+                                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Rounded.ContentCopy"
+                                  OnAdornmentClick="@(() => CopyToClipboard(_linuxInstall))"
+                                  Style="font-family:'JetBrains Mono',monospace;font-size:0.75rem" />
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.subtitle1">Windows</MudText>
+                    <MudText Typo="Typo.body2" Class="mb-2">PowerShell:</MudText>
+                    <MudTextField Value="@_winInstall" ReadOnly="true" Variant="Variant.Outlined"
+                                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Rounded.ContentCopy"
+                                  OnAdornmentClick="@(() => CopyToClipboard(_winInstall))"
+                                  Style="font-family:'JetBrains Mono',monospace;font-size:0.75rem" />
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-3" Elevation="1">
+                    <MudText Typo="Typo.subtitle1">Docker</MudText>
+                    <MudTextField Value="@_dockerInstall" ReadOnly="true" Variant="Variant.Outlined" Lines="4"
+                                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Rounded.ContentCopy"
+                                  OnAdornmentClick="@(() => CopyToClipboard(_dockerInstall))"
+                                  Style="font-family:'JetBrains Mono',monospace;font-size:0.75rem" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    List<Server> _servers = new();
+    List<EnrollmentToken> _tokens = new();
+
+    string _linuxInstall = "curl -fsSL https://mydash.local/install.sh | sudo bash -s -- --hub https://mydash.local --token <TOKEN> --name myserver";
+    string _winInstall = "irm https://mydash.local/install.ps1 | iex -- --hub https://mydash.local --token <TOKEN> --name myserver";
+    string _dockerInstall = "services:\n  mydash-agent:\n    image: ghcr.io/user/mydash-agent:latest\n    environment:\n      MYDASH_HUB: https://mydash.local\n      MYDASH_TOKEN: <TOKEN>\n      MYDASH_NAME: myserver\n    restart: unless-stopped";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+    }
+
+    async Task Refresh()
+    {
+        _servers = await Servers.ListAllAsync();
+        _tokens = await Tokens.ListAllAsync();
+    }
+
+    async Task OpenConnectWizard()
+    {
+        var result = await Dialog.ShowAsync<ConnectServerDialog>("Connect a Server");
+        var dr = await result.Result;
+        if (!dr!.Canceled) await Refresh();
+    }
+
+    async Task RevokeAgent(Server server)
+    {
+        await Servers.DeleteAsync(server.Id);
+        Snackbar.Add($"Agent {server.Name} revoked", Severity.Info);
+        await Refresh();
+    }
+
+    async Task RevokeToken(EnrollmentToken token)
+    {
+        token.Revoke();
+        await Tokens.UpdateAsync(token);
+        Snackbar.Add("Token revoked", Severity.Info);
+        await Refresh();
+    }
+
+    void CopyToClipboard(string text) { }
+
+    Color StatusColor(ServerStatus s) => s switch
+    {
+        ServerStatus.Up => Color.Success,
+        ServerStatus.Down => Color.Error,
+        ServerStatus.Degraded => Color.Warning,
+        _ => Color.Default,
+    };
+}

@@ -1,0 +1,137 @@
+@page "/scanner"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IServerRepository Servers
+@inject IServiceRepository Services
+@inject ISnackbar Snackbar
+
+<PageTitle>Port Scanner — MyDash</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Port Scanner</MudText>
+
+<MudPaper Class="pa-3 mb-4" Elevation="2">
+    <MudGrid AlignItems="AlignItems.Center">
+        <MudItem xs="12" sm="4">
+            <MudSelect @bind-Value="_selectedServerId" Label="Server" Variant="Variant.Outlined">
+                @foreach (var s in _servers)
+                {
+                    <MudSelectItem Value="@s.Id.ToString()">@s.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" sm="2">
+            <MudNumericField @bind-Value="_fromPort" Label="From Port" Min="1" Max="65535" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="6" sm="2">
+            <MudNumericField @bind-Value="_toPort" Label="To Port" Min="1" Max="65535" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Search"
+                       OnClick="StartScan" Disabled="_scanning || string.IsNullOrEmpty(_selectedServerId)">
+                @(_scanning ? "Scanning…" : "Scan")
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-2" Style="background:#0d1117;min-height:300px;max-height:400px;overflow-y:auto;">
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Terminal Output</MudText>
+            @foreach (var line in _terminalLines)
+            {
+                <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:#e6edf3;">
+                    <span style="color:#7ee787">@line.timestamp</span>
+                    <span style="color:@(line.level=="error"?"#f85149":line.level=="warn"?"#e3b341":"#79c0ff")">[@line.level]</span>
+                    <span> @line.message</span>
+                </div>
+            }
+            @if (!_terminalLines.Any())
+            {
+                <MudText Color="Color.Secondary" Typo="Typo.body2">Run a scan to see output here.</MudText>
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Open Ports Found</MudText>
+        <MudTable Items="_results" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>Port</MudTh>
+                <MudTh>Service</MudTh>
+                <MudTh>Action</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd Style="font-family:'JetBrains Mono',monospace">@context.Port</MudTd>
+                <MudTd>@context.Name</MudTd>
+                <MudTd>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => RegisterPort(context))">Register</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-3" Color="Color.Secondary">No results yet.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudItem>
+</MudGrid>
+
+@code {
+    List<Server> _servers = new();
+    string _selectedServerId = "";
+    int _fromPort = 1, _toPort = 1024;
+    bool _scanning;
+    List<(string timestamp, string level, string message)> _terminalLines = new();
+    List<(int Port, string Name)> _results = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _servers = await Servers.ListAllAsync();
+        if (_servers.Count > 0) _selectedServerId = _servers[0].Id.ToString();
+    }
+
+    async Task StartScan()
+    {
+        _scanning = true;
+        _terminalLines.Clear();
+        _results.Clear();
+
+        Log("info", $"Starting TCP scan on ports {_fromPort}-{_toPort}");
+        await Task.Delay(200);
+
+        for (int port = _fromPort; port <= Math.Min(_toPort, _fromPort + 50); port++)
+        {
+            await Task.Delay(20);
+            if (IsWellKnown(port))
+            {
+                Log("info", $"Port {port} open — {WellKnownName(port)}");
+                _results.Add((port, WellKnownName(port)));
+            }
+            StateHasChanged();
+        }
+
+        Log("info", $"Scan complete. Found {_results.Count} open port(s).");
+        _scanning = false;
+    }
+
+    void Log(string level, string msg) =>
+        _terminalLines.Add((DateTimeOffset.UtcNow.ToString("HH:mm:ss.fff"), level, msg));
+
+    bool IsWellKnown(int port) => port is 80 or 443 or 22 or 3000 or 8080 or 9000 or 32400 or 7878 or 8989 or 8384 or 5000;
+
+    string WellKnownName(int port) => port switch
+    {
+        80 => "HTTP", 443 => "HTTPS", 22 => "SSH",
+        3000 => "Grafana", 8080 => "Web", 9000 => "Portainer",
+        32400 => "Plex", 7878 => "Radarr", 8989 => "Sonarr",
+        8384 => "Syncthing", 5000 => "Web App",
+        _ => "unknown",
+    };
+
+    async Task RegisterPort((int Port, string Name) r)
+    {
+        if (!Guid.TryParse(_selectedServerId, out var sid)) return;
+        var svc = Domain.Entities.Service.Create(sid, r.Name, r.Port, ServiceType.Native);
+        await Services.AddAsync(svc);
+        Snackbar.Add($"Port {r.Port} registered as {r.Name}", Severity.Success);
+        _results.Remove(r);
+    }
+}

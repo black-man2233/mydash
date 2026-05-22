@@ -1,23 +1,61 @@
 ﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<MudThemeProvider Theme="_theme" IsDarkMode="@_isDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+<MudLayout>
+    <MudAppBar Color="Color.Primary" Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Rounded.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-2">MyDash</MudText>
+        <MudSpacer />
+        <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Rounded.VerifiedUser">tailnet · verified</MudChip>
+        <MudIconButton Icon="@(_isDark ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)"
+                       Color="Color.Inherit" OnClick="ToggleTheme" Class="ml-2" />
+    </MudAppBar>
 
-        <article class="content px-4">
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" Variant="DrawerVariant.Mini" OpenMiniOnHover="true">
+        <MudNavMenu>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="/fleet" Icon="@Icons.Material.Rounded.Hub">Fleet</MudNavLink>
+            <MudNavLink Href="/scanner" Icon="@Icons.Material.Rounded.Search">Scanner</MudNavLink>
+            <MudNavLink Href="/audit" Icon="@Icons.Material.Rounded.Assignment">Audit Log</MudNavLink>
+            <MudNavLink Href="/settings" Icon="@Icons.Material.Rounded.Settings">Settings</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
             @Body
-        </article>
-    </main>
-</div>
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+@code {
+    bool _drawerOpen = true;
+    bool _isDark = true;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight { Primary = "#594AE2", Secondary = "#FF4081" },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#594AE2",
+            Secondary = "#FF4081",
+            Background = "#1a1a2e",
+            Surface = "#16213e",
+            DrawerBackground = "#0f3460",
+            AppbarBackground = "#594AE2",
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontFamily = ["Roboto", "sans-serif"] },
+        },
+        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "6px" },
+    };
+
+    void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+    void ToggleTheme() => _isDark = !_isDark;
+}

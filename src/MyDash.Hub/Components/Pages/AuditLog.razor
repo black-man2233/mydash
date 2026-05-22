@@ -1,0 +1,51 @@
+@page "/audit"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IAuditRepository Audit
+
+<PageTitle>Audit Log — MyDash</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">Audit Log</MudText>
+
+<MudTable Items="_entries" Hover="true" Dense="true" Striped="true" SortLabel="Sort By">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Recent Activity</MudText>
+        <MudSpacer />
+        <MudButton StartIcon="@Icons.Material.Rounded.Refresh" OnClick="Refresh">Refresh</MudButton>
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh><MudTableSortLabel SortBy="@(new Func<AuditEntry, object>(x => x.At))">Time</MudTableSortLabel></MudTh>
+        <MudTh>Actor</MudTh>
+        <MudTh><MudTableSortLabel SortBy="@(new Func<AuditEntry, object>(x => x.Action.ToString()))">Action</MudTableSortLabel></MudTh>
+        <MudTh>Target</MudTh>
+        <MudTh>IP</MudTh>
+        <MudTh>Outcome</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd Style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">@context.At.ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+        <MudTd>@context.Actor</MudTd>
+        <MudTd>@context.Action</MudTd>
+        <MudTd>@context.Target</MudTd>
+        <MudTd Style="font-family:'JetBrains Mono',monospace;font-size:0.75rem">@context.Ip</MudTd>
+        <MudTd>
+            <MudChip T="string" Size="Size.Small" Color="@(context.Outcome == "ok" ? Color.Success : Color.Error)">@context.Outcome</MudChip>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Class="pa-4" Color="Color.Secondary">No audit entries yet.</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@code {
+    List<AuditEntry> _entries = new();
+
+    protected override async Task OnInitializedAsync() => await Refresh();
+
+    async Task Refresh()
+    {
+        _entries = await Audit.ListAsync(200);
+    }
+}

@@ -1,0 +1,154 @@
+@page "/login"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@using MyDash.Application.UseCases
+@inject RequestPinHandler PinHandler
+@inject VerifyPinHandler VerifyHandler
+@inject NavigationManager Nav
+@inject IHttpContextAccessor HttpCtx
+
+<PageTitle>MyDash — Sign In</PageTitle>
+
+<div class="pin-gate-bg">
+    <MudPaper Class="pin-gate-card" Elevation="8">
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-1">
+            <MudIcon Icon="@Icons.Material.Rounded.Shield" Color="Color.Primary" Size="Size.Large" />
+        </MudText>
+        <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-1">MyDash</MudText>
+        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mb-4">
+            Homelab Dashboard
+        </MudText>
+
+        @if (_challengeId is null)
+        {
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-3">
+                A 6-digit code will be sent to your registered phone.
+            </MudText>
+            <MudButton class="send-btn" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       OnClick="SendCode" Disabled="_sending">
+                @(_sending ? "Sending…" : "Send code")
+            </MudButton>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-1">
+                Code sent to @_phoneMasked via @_provider
+            </MudText>
+            <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary" Class="mb-3">
+                Expires in @_expiresIn s
+            </MudText>
+
+            <div class="pin-input @(_error ? "err" : "")">
+                <MudTextField @bind-Value="_code" Label="6-digit code" Mask="@(new PatternMask("000000"))"
+                              InputType="InputType.Text" MaxLength="6" Immediate="true" Class="pin-field"
+                              OnKeyUp="HandleKeyUp" />
+            </div>
+
+            @if (_error)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@_errorMsg</MudAlert>
+            }
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-3"
+                       OnClick="VerifyCode" Disabled="_verifying">
+                @(_verifying ? "Verifying…" : "Sign in")
+            </MudButton>
+            <MudButton Variant="Variant.Text" FullWidth="true" Class="mt-1" OnClick="Reset">
+                Send a new code
+            </MudButton>
+        }
+    </MudPaper>
+</div>
+
+<style>
+.pin-gate-bg {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+.pin-gate-card {
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 380px;
+    border-radius: 16px !important;
+}
+.pin-field { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3em; }
+.pin-input.err .mud-input { border-color: var(--mud-palette-error) !important; }
+</style>
+
+@code {
+    string? _challengeId;
+    string _code = "";
+    string _phoneMasked = "";
+    string _provider = "";
+    int _expiresIn = 300;
+    bool _sending, _verifying, _error;
+    string _errorMsg = "";
+
+    private string ClientIp => HttpCtx.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    async Task SendCode()
+    {
+        _sending = true;
+        _error = false;
+        try
+        {
+            var result = await PinHandler.Handle(new RequestPin(ClientIp), default);
+            _challengeId = result.ChallengeId;
+            _phoneMasked = result.PhoneMasked;
+            _provider = result.Provider;
+            _expiresIn = result.ExpiresInSeconds;
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _errorMsg = ex.Message;
+        }
+        _sending = false;
+    }
+
+    async Task VerifyCode()
+    {
+        if (_code.Length < 6) return;
+        _verifying = true;
+        _error = false;
+        try
+        {
+            var result = await VerifyHandler.Handle(new VerifyPin(_challengeId!, _code, ClientIp), default);
+            if (result.Ok)
+            {
+                Nav.NavigateTo("/");
+            }
+            else if (result.LockedOut)
+            {
+                _error = true;
+                _errorMsg = $"Too many failed attempts. Try again in {result.LockoutSeconds / 60} min.";
+            }
+            else
+            {
+                _error = true;
+                _errorMsg = $"Wrong code. {result.AttemptsRemaining} attempt(s) remaining.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _errorMsg = ex.Message;
+        }
+        _verifying = false;
+    }
+
+    async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await VerifyCode();
+    }
+
+    void Reset()
+    {
+        _challengeId = null;
+        _code = "";
+        _error = false;
+    }
+}
