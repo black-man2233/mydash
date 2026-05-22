@@ -6,6 +6,7 @@ using MyDash.Application.Repositories;
 using MyDash.Application.Services;
 using MyDash.Application.UseCases;
 using MyDash.Hub.Components;
+using Microsoft.EntityFrameworkCore;
 using MyDash.Infrastructure.Data;
 using MyDash.Infrastructure.GrpcServices;
 using MyDash.Infrastructure.Repositories;
@@ -30,8 +31,9 @@ try
     builder.Services.AddRazorComponents().AddInteractiveServerComponents();
     builder.Services.AddGrpc();
 
-    var connStr = builder.Configuration["Database:ConnectionString"] ?? "Data Source=mydash.db";
-    builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connStr));
+    var connStr = builder.Configuration["Database:ConnectionString"]
+        ?? "Server=localhost;Database=MyDash;User Id=sa;Password=MyDash_Str0ng!;TrustServerCertificate=true;";
+    builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connStr));
 
     builder.Services.Configure<SmsOptions>(builder.Configuration.GetSection("Sms"));
     builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection("Security"));
@@ -90,12 +92,6 @@ try
     builder.Services.AddHostedService<PinChallengeJanitor>();
 
     var app = builder.Build();
-
-    using (var scope = app.Services.CreateScope())
-    {
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.EnsureCreated();
-    }
 
     if (!app.Environment.IsDevelopment())
         app.UseExceptionHandler("/Error", createScopeForErrors: true);

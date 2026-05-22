@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MyDash.Domain.Entities;
 
 namespace MyDash.Infrastructure.Data;
