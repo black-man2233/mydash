@@ -1,0 +1,71 @@
+syntax = "proto3";
+package mydash.agent.v1;
+option csharp_namespace = "MyDash.Contracts.Agent.V1";
+
+service AgentService {
+  rpc Enroll (EnrollRequest) returns (EnrollResponse);
+  rpc Stream (stream AgentMessage) returns (stream HubMessage);
+}
+
+message EnrollRequest {
+  string token = 1;
+  string hostname = 2;
+  string os = 3;
+  string agent_version = 4;
+  string public_key = 5;
+}
+
+message EnrollResponse {
+  string server_id = 1;
+  bytes client_certificate = 2;
+  bytes client_key = 3;
+  string fingerprint = 4;
+  int32 heartbeat_seconds = 5;
+}
+
+message AgentMessage {
+  oneof payload {
+    Heartbeat heartbeat = 1;
+    ServiceReport services = 2;
+    ScanResult scan = 3;
+    LogLine log = 4;
+  }
+}
+
+message HubMessage {
+  oneof payload {
+    ScanCommand run_scan = 1;
+    UpgradeCommand upgrade = 2;
+    ShellCommand shell = 3;
+    PingCommand ping = 4;
+  }
+}
+
+message Heartbeat {
+  double cpu_percent = 1;
+  double mem_percent = 2;
+  double disk_percent = 3;
+  int64 uptime_seconds = 4;
+  string version = 5;
+}
+
+message ServiceReport {
+  repeated DiscoveredService services = 1;
+}
+
+message DiscoveredService {
+  int32 port = 1;
+  string service_type = 2;
+  string docker_image = 3;
+  string docker_container_id = 4;
+  string name = 5;
+  repeated string tags = 6;
+  string status = 7;
+}
+
+message ScanCommand { int32 from_port = 1; int32 to_port = 2; bool include_udp = 3; }
+message ScanResult { repeated DiscoveredService open = 1; double elapsed_seconds = 2; }
+message UpgradeCommand { string version = 1; }
+message ShellCommand { string session_id = 1; string command = 2; }
+message PingCommand { string nonce = 1; }
+message LogLine { string level = 1; string message = 2; int64 timestamp_unix_ms = 3; }

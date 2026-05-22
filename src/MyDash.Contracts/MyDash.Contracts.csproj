@@ -16,4 +16,10 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <Protobuf Include="Protos/agent.proto" GrpcServices="Both" />
+    <Protobuf Include="Protos/auth.proto"  GrpcServices="Both" />
+    <Protobuf Include="Protos/fleet.proto" GrpcServices="Both" />
+  </ItemGroup>
+
 </Project>

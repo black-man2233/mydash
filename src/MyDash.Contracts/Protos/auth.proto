@@ -1,0 +1,24 @@
+syntax = "proto3";
+package mydash.auth.v1;
+option csharp_namespace = "MyDash.Contracts.Auth.V1";
+
+service AuthService {
+  rpc RequestPin (RequestPinRequest) returns (RequestPinResponse);
+  rpc VerifyPin  (VerifyPinRequest)  returns (VerifyPinResponse);
+}
+
+message RequestPinRequest { string client_ip = 1; }
+message RequestPinResponse {
+  string challenge_id = 1;
+  int32 expires_in_seconds = 2;
+  string phone_masked = 3;
+  string provider = 4;
+}
+message VerifyPinRequest { string challenge_id = 1; string code = 2; string client_ip = 3; }
+message VerifyPinResponse {
+  bool ok = 1;
+  string session_token = 2;
+  int32 attempts_remaining = 3;
+  bool locked_out = 4;
+  int32 lockout_seconds = 5;
+}
