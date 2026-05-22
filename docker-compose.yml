@@ -1,0 +1,95 @@
+services:
+
+  # ─── SQL Server ────────────────────────────────────────────────────────────
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD:-MyDash_Str0ng!}"
+    volumes:
+      - sqldata:/var/opt/mssql
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: >
+        /opt/mssql-tools18/bin/sqlcmd
+        -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C
+        -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ─── Schema init (runs once, exits 0 on success) ──────────────────────────
+  db-init:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_SERVER: db
+      DB_USER: sa
+      DB_PASSWORD: "${DB_PASSWORD:-MyDash_Str0ng!}"
+      DB_NAME: "${DB_NAME:-MyDash}"
+    restart: "no"
+
+  # ─── Hub (Blazor Server + gRPC) ───────────────────────────────────────────
+  hub:
+    build:
+      context: .
+      dockerfile: src/MyDash.Hub/Dockerfile
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    ports:
+      - "${HUB_HTTP_PORT:-8080}:8080"
+      - "${HUB_GRPC_PORT:-7777}:7777"
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+      Database__ConnectionString: >-
+        Server=db;Database=${DB_NAME:-MyDash};
+        User Id=sa;Password=${DB_PASSWORD:-MyDash_Str0ng!};
+        TrustServerCertificate=true;
+      Hub__AgentGrpcPort: "7777"
+      Hub__HubPublicUrl: "${HUB_PUBLIC_URL:-http://localhost:8080}"
+      Sms__Provider: "${SMS_PROVIDER:-TextBelt}"
+      Sms__PhoneE164: "${SMS_PHONE:-}"
+      Sms__ApiKey: "${SMS_API_KEY:-textbelt}"
+      Sms__From: "MyDash"
+      Security__PinTtlSeconds: "300"
+      Security__MaxFailedAttempts: "3"
+      Security__LockoutSeconds: "900"
+      Security__SessionCookieHours: "12"
+    volumes:
+      - hub-logs:/app/logs
+      - hub-data:/var/lib/mydash
+    restart: unless-stopped
+
+  # ─── Agent (optional — one per machine you want to monitor) ──────────────
+  agent:
+    build:
+      context: .
+      dockerfile: src/MyDash.Agent/Dockerfile
+    depends_on:
+      hub:
+        condition: service_started
+    environment:
+      MYDASH_HUB: "http://hub:8080"
+      MYDASH_TOKEN: "${AGENT_TOKEN:-}"
+      MYDASH_NAME: "${AGENT_NAME:-docker-agent}"
+    volumes:
+      - agent-data:/var/lib/mydash-agent
+      - agent-logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    profiles:
+      - agent
+
+volumes:
+  sqldata:
+  hub-logs:
+  hub-data:
+  agent-data:
+  agent-logs:
