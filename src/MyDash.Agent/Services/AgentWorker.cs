@@ -66,8 +66,15 @@ public class AgentWorker : BackgroundService
 
         var client = new AgentService.AgentServiceClient(channel);
 
-        if (_serverId is null && !string.IsNullOrEmpty(_opts.Token))
+        if (_serverId is null)
         {
+            if (string.IsNullOrEmpty(_opts.Token))
+            {
+                _logger.LogWarning("No enrollment token configured — skipping session");
+                await Task.Delay(TimeSpan.FromMinutes(1), ct);
+                return;
+            }
+
             var keypair = ECDsa.Create();
             var pubKey = Convert.ToBase64String(keypair.ExportSubjectPublicKeyInfo());
 
@@ -96,7 +103,7 @@ public class AgentWorker : BackgroundService
             int tick = 0;
             while (!ct.IsCancellationRequested)
             {
-                var hb = BuildHeartbeat();
+                var hb = BuildHeartbeat(_serverId!);
                 await stream.RequestStream.WriteAsync(new AgentMessage { Heartbeat = hb }, ct);
 
                 if (++tick % 12 == 0)
@@ -122,10 +129,11 @@ public class AgentWorker : BackgroundService
         await heartbeatTask;
     }
 
-    private static Heartbeat BuildHeartbeat()
+    private static Heartbeat BuildHeartbeat(string serverId)
     {
         return new Heartbeat
         {
+            ServerId = serverId,
             CpuPercent = GetCpuEstimate(),
             MemPercent = GetMemEstimate(),
             DiskPercent = GetDiskEstimate(),

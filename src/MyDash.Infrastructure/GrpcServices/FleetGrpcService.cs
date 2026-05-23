@@ -90,11 +90,10 @@ public class FleetGrpcService : FleetService.FleetServiceBase
     {
         var ttl = TimeSpan.FromMinutes(request.TtlMinutes > 0 ? request.TtlMinutes : 60);
         var plaintext = await _tokens.IssueAsync(request.Name, request.Tags.ToArray(), ttl, context.CancellationToken);
-        var token = (await _tokens.ListAllAsync(context.CancellationToken)).First();
         return new CreateEnrollmentResponse
         {
             TokenPlaintext = plaintext,
-            ExpiresAtUnix = token.ExpiresAt.ToUnixTimeSeconds(),
+            ExpiresAtUnix = DateTimeOffset.UtcNow.Add(ttl).ToUnixTimeSeconds(),
         };
     }
 

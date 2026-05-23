@@ -85,6 +85,10 @@ public class AgentGrpcService : AgentService.AgentServiceBase
             if (msg.PayloadCase == AgentMessage.PayloadOneofCase.Heartbeat)
             {
                 var hb = msg.Heartbeat;
+
+                if (server is null && Guid.TryParse(hb.ServerId, out var sid))
+                    server = await _servers.GetByIdAsync(sid, context.CancellationToken);
+
                 if (server is not null)
                 {
                     server.CpuPercent = hb.CpuPercent;

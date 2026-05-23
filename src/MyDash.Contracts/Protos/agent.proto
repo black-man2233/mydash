@@ -47,6 +47,7 @@ message Heartbeat {
   double disk_percent = 3;
   int64 uptime_seconds = 4;
   string version = 5;
+  string server_id = 6;
 }
 
 message ServiceReport {
