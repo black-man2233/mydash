@@ -44,20 +44,25 @@ public class RequestPinHandler
 
         await _challenges.AddAsync(challenge, ct);
 
-        var body = $"Your {_smsOpts.From} code is: {code}";
-        var result = await _sms.SendAsync(_smsOpts.PhoneE164, body, ct);
+        string smsOutcome;
+        try
+        {
+            var body = $"Your {_smsOpts.From} code is: {code}";
+            var smsResult = await _sms.SendAsync(_smsOpts.PhoneE164, body, ct);
+            smsOutcome = smsResult.Success ? "ok" : $"sms_failed:{smsResult.Error}";
+        }
+        catch (Exception ex)
+        {
+            smsOutcome = $"sms_error:{ex.Message}";
+        }
 
-        await _audit.WriteAsync(AuditEntry.Create(AuditAction.PinRequested, "login", request.ClientIp,
-            result.Success ? "ok" : "sms_failed"), ct);
+        await _audit.WriteAsync(AuditEntry.Create(AuditAction.PinRequested, "login", request.ClientIp, smsOutcome), ct);
 
         var masked = MaskPhone(_smsOpts.PhoneE164);
         return new RequestPinResult(challenge.Id.ToString(), _secOpts.PinTtlSeconds, masked, _sms.ProviderName);
     }
 
-    private static string GenerateCode()
-    {
-        return Random.Shared.Next(100000, 999999).ToString();
-    }
+    private static string GenerateCode() => Random.Shared.Next(100000, 999999).ToString();
 
     private static string MaskPhone(string phone)
     {

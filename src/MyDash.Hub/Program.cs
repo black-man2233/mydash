@@ -1,11 +1,15 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using MyDash.Infrastructure.BackgroundServices;
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 using MyDash.Application.Options;
 using MyDash.Application.Repositories;
 using MyDash.Application.Services;
 using MyDash.Application.UseCases;
 using MyDash.Hub.Components;
+using MyDash.Hub.Services;
+using MyDash.Infrastructure.BackgroundServices;
 using MyDash.Infrastructure.Data;
 using MyDash.Infrastructure.GrpcServices;
 using MyDash.Infrastructure.Repositories;
@@ -28,6 +32,7 @@ try
         .WriteTo.File("logs/hub-.log", rollingInterval: RollingInterval.Day));
 
     builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+    builder.Services.AddMudServices();
     builder.Services.AddGrpc();
 
     var connStr = builder.Configuration["Database:ConnectionString"]
@@ -85,6 +90,7 @@ try
     builder.Services.AddAuthorization();
     builder.Services.AddCascadingAuthenticationState();
     builder.Services.AddHttpContextAccessor();
+    builder.Services.AddSingleton<PendingAuthStore>();
 
     builder.Services.AddHostedService<AgentHeartbeatWatchdog>();
     builder.Services.AddHostedService<EnrollmentTokenJanitor>();
@@ -95,10 +101,23 @@ try
     if (!app.Environment.IsDevelopment())
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
 
-    app.UseHttpsRedirection();
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
+
+    // Blazor interactive components run over WebSocket and cannot set cookies.
+    // Login.razor issues a 30-second one-time token and force-navigates here
+    // so SignInAsync runs on a real HTTP request.
+    app.MapGet("/auth/signin", async (string t, HttpContext ctx, PendingAuthStore store) =>
+    {
+        if (!store.Consume(t))
+            return Results.Redirect("/login");
+
+        var claims = new[] { new Claim(ClaimTypes.Name, "admin") };
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+        return Results.Redirect("/");
+    }).AllowAnonymous();
 
     app.MapGrpcService<AuthGrpcService>();
     app.MapGrpcService<FleetGrpcService>();

@@ -62,6 +62,7 @@ services:
       Security__MaxFailedAttempts: "3"
       Security__LockoutSeconds: "900"
       Security__SessionCookieHours: "12"
+      Security__BypassPin: "${BYPASS_PIN:-}"
     volumes:
       - hub-logs:/app/logs
       - hub-data:/var/lib/mydash
