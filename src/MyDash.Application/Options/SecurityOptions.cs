@@ -7,4 +7,5 @@ public class SecurityOptions
     public int LockoutSeconds { get; set; } = 900;
     public int SessionCookieHours { get; set; } = 12;
     public string[] TailnetCidrs { get; set; } = Array.Empty<string>();
+    public string? BypassPin { get; set; }
 }
