@@ -2,10 +2,12 @@
 @layout EmptyLayout
 @rendermode InteractiveServer
 @using MyDash.Application.UseCases
+@using MyDash.Hub.Services
 @inject RequestPinHandler PinHandler
 @inject VerifyPinHandler VerifyHandler
 @inject NavigationManager Nav
 @inject IHttpContextAccessor HttpCtx
+@inject PendingAuthStore AuthStore
 
 <PageTitle>MyDash — Sign In</PageTitle>
 
@@ -22,9 +24,13 @@
         @if (_challengeId is null)
         {
             <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-3">
-                A 6-digit code will be sent to your registered phone.
+                A one-time code will be sent to your registered phone.
             </MudText>
-            <MudButton class="send-btn" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+            @if (_error)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-2">@_errorMsg</MudAlert>
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                        OnClick="SendCode" Disabled="_sending">
                 @(_sending ? "Sending…" : "Send code")
             </MudButton>
@@ -38,19 +44,13 @@
                 Expires in @_expiresIn s
             </MudText>
 
-            <div class="pin-input @(_error ? "err" : "")">
-                <MudTextField @bind-Value="_code" Label="6-digit code" Mask="@(new PatternMask("000000"))"
-                              InputType="InputType.Text" MaxLength="6" Immediate="true" Class="pin-field"
-                              OnKeyUp="HandleKeyUp" />
-            </div>
-
-            @if (_error)
-            {
-                <MudAlert Severity="Severity.Error" Class="mt-2">@_errorMsg</MudAlert>
-            }
+            <MudTextField @bind-Value="_code" Label="Code" Variant="Variant.Outlined"
+                          InputType="InputType.Text" Immediate="true" Class="pin-field"
+                          Error="_error" ErrorText="@_errorMsg"
+                          OnKeyUp="HandleKeyUp" />
 
             <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-3"
-                       OnClick="VerifyCode" Disabled="_verifying">
+                       OnClick="VerifyCode" Disabled="@(_verifying || string.IsNullOrWhiteSpace(_code))">
                 @(_verifying ? "Verifying…" : "Sign in")
             </MudButton>
             <MudButton Variant="Variant.Text" FullWidth="true" Class="mt-1" OnClick="Reset">
@@ -74,8 +74,12 @@
     max-width: 380px;
     border-radius: 16px !important;
 }
-.pin-field { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3em; }
-.pin-input.err .mud-input { border-color: var(--mud-palette-error) !important; }
+.pin-field input {
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.3em;
+    font-size: 1.4rem;
+    text-align: center;
+}
 </style>
 
 @code {
@@ -111,15 +115,16 @@
 
     async Task VerifyCode()
     {
-        if (_code.Length < 6) return;
+        if (string.IsNullOrWhiteSpace(_code)) return;
         _verifying = true;
         _error = false;
         try
         {
-            var result = await VerifyHandler.Handle(new VerifyPin(_challengeId!, _code, ClientIp), default);
+            var result = await VerifyHandler.Handle(new VerifyPin(_challengeId!, _code.Trim(), ClientIp), default);
             if (result.Ok)
             {
-                Nav.NavigateTo("/");
+                var token = AuthStore.Issue();
+                Nav.NavigateTo($"/auth/signin?t={token}", forceLoad: true);
             }
             else if (result.LockedOut)
             {
