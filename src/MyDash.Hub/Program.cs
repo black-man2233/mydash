@@ -1,14 +1,10 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
-using MudBlazor.Services;
 using MyDash.Application.Options;
 using MyDash.Application.Repositories;
 using MyDash.Application.Services;
 using MyDash.Application.UseCases;
-using MyDash.Hub.Components;
-using MyDash.Hub.Services;
+using MyDash.Hub.Api;
 using MyDash.Infrastructure.BackgroundServices;
 using MyDash.Infrastructure.Data;
 using MyDash.Infrastructure.GrpcServices;
@@ -31,8 +27,6 @@ try
         .WriteTo.Console()
         .WriteTo.File("logs/hub-.log", rollingInterval: RollingInterval.Day));
 
-    builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-    builder.Services.AddMudServices();
     builder.Services.AddGrpc();
 
     var connStr = builder.Configuration["Database:ConnectionString"]
@@ -81,16 +75,23 @@ try
     builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(o =>
         {
-            o.LoginPath = "/login";
-            o.AccessDeniedPath = "/login";
             o.SlidingExpiration = true;
             var hours = builder.Configuration.GetValue<int>("Security:SessionCookieHours", 12);
             o.ExpireTimeSpan = TimeSpan.FromHours(hours);
+            // Return 401/403 JSON instead of redirecting for REST clients
+            o.Events.OnRedirectToLogin = ctx =>
+            {
+                ctx.Response.StatusCode = 401;
+                return Task.CompletedTask;
+            };
+            o.Events.OnRedirectToAccessDenied = ctx =>
+            {
+                ctx.Response.StatusCode = 403;
+                return Task.CompletedTask;
+            };
         });
     builder.Services.AddAuthorization();
-    builder.Services.AddCascadingAuthenticationState();
     builder.Services.AddHttpContextAccessor();
-    builder.Services.AddSingleton<PendingAuthStore>();
 
     builder.Services.AddHostedService<AgentHeartbeatWatchdog>();
     builder.Services.AddHostedService<EnrollmentTokenJanitor>();
@@ -99,33 +100,20 @@ try
     var app = builder.Build();
 
     if (!app.Environment.IsDevelopment())
-        app.UseExceptionHandler("/Error", createScopeForErrors: true);
+        app.UseExceptionHandler("/error");
 
     app.UseAuthentication();
     app.UseAuthorization();
-    app.UseAntiforgery();
-
-    // Blazor interactive components run over WebSocket and cannot set cookies.
-    // Login.razor issues a 30-second one-time token and force-navigates here
-    // so SignInAsync runs on a real HTTP request.
-    app.MapGet("/auth/signin", async (string t, HttpContext ctx, PendingAuthStore store) =>
-    {
-        if (!store.Consume(t))
-            return Results.Redirect("/login");
-
-        var claims = new[] { new Claim(ClaimTypes.Name, "admin") };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-        return Results.Redirect("/");
-    }).AllowAnonymous();
 
     app.MapGrpcService<AuthGrpcService>();
     app.MapGrpcService<FleetGrpcService>();
     app.MapGrpcService<AgentGrpcService>();
 
-    app.MapStaticAssets();
-    app.MapRazorComponents<App>()
-        .AddInteractiveServerRenderMode();
+    app.MapAuthApi();
+    app.MapServersApi();
+    app.MapEnrollmentApi();
+    app.MapAuditApi();
+    app.MapPreferencesApi();
 
     app.Run();
 }

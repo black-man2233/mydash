@@ -35,7 +35,7 @@ services:
       DB_NAME: "${DB_NAME:-MyDash}"
     restart: "no"
 
-  # ─── Hub (Blazor Server + gRPC) ───────────────────────────────────────────
+  # ─── Hub (REST API + gRPC) ────────────────────────────────────────────────
   hub:
     build:
       context: .
@@ -44,15 +44,13 @@ services:
       db-init:
         condition: service_completed_successfully
     ports:
-      - "${HUB_HTTP_PORT:-9999}:8080"
-      - "${HUB_GRPC_PORT:-7777}:7777"
+      - "${HUB_GRPC_PORT:-8080}:8080"   # exposed so external agents can connect
     environment:
       ASPNETCORE_URLS: "http://+:8080"
       Database__ConnectionString: >-
         Server=db;Database=${DB_NAME:-MyDash};
         User Id=sa;Password=${DB_PASSWORD:-MyDash_Str0ng!};
         TrustServerCertificate=true;
-      Hub__AgentGrpcPort: "7777"
       Hub__HubPublicUrl: "${HUB_PUBLIC_URL:-http://localhost:8080}"
       Sms__Provider: "${SMS_PROVIDER:-TextBelt}"
       Sms__PhoneE164: "${SMS_PHONE:-}"
@@ -68,6 +66,18 @@ services:
       - hub-data:/var/lib/mydash
     restart: unless-stopped
 
+  # ─── Web (Vue 3 + Vuetify 3 — proxies /api to hub) ───────────────────────
+  web:
+    build:
+      context: src/MyDash.Web
+      dockerfile: Dockerfile
+    depends_on:
+      hub:
+        condition: service_started
+    ports:
+      - "${WEB_PORT:-9999}:80"
+    restart: unless-stopped
+
   # ─── Agent (optional — one per machine you want to monitor) ──────────────
   agent:
     build:
@@ -77,7 +87,7 @@ services:
       hub:
         condition: service_started
     environment:
-      MYDASH_HUB: "http://hub:8080"
+      MYDASH_HUB: "http://hub:8080"  # gRPC + HTTP both on 8080
       MYDASH_TOKEN: "${AGENT_TOKEN:-}"
       MYDASH_NAME: "${AGENT_NAME:-docker-agent}"
     volumes:
