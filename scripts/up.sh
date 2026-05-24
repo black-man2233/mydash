@@ -10,16 +10,22 @@ err()  { echo -e "${R}[ err  ]${N} $*"; }
 
 [ -f .env ] && { set -a; source .env; set +a; }
 
-SERVICES=(); BUILD=true; DETACH=true; AGENT=false; CLEAN=false
+SERVICES=(); BUILD=true; DETACH=true; AGENT=false; CLEAN=false; AGENT_ONLY=false
 for arg in "$@"; do
   case $arg in
-    --no-build) BUILD=false ;;
-    --attach)   DETACH=false ;;
-    --agent)    AGENT=true ;;
-    --clean)    CLEAN=true ;;
-    hub|web|db) SERVICES+=("$arg") ;;
+    --no-build)       BUILD=false ;;
+    --attach)         DETACH=false ;;
+    --agent|agent)    AGENT=true ;;
+    --agent-only)     AGENT=true; AGENT_ONLY=true ;;
+    --clean)          CLEAN=true ;;
+    hub|web|db)       SERVICES+=("$arg") ;;
   esac
 done
+
+# running just "agent" means this machine is an agent-only node — don't start hub/web/db
+[ ${#SERVICES[@]} -eq 0 ] && $AGENT && ! $AGENT_ONLY && \
+  { warn "Tip: use --agent-only to skip hub/web/db on this machine"; }
+$AGENT && [ ${#SERVICES[@]} -eq 0 ] && AGENT_ONLY=true
 
 echo ""
 echo -e "${C}  ███╗   ███╗██╗   ██╗██████╗  █████╗ ███████╗██╗  ██╗${N}"
@@ -37,18 +43,20 @@ if (( $(echo "$CACHE_GB > 3" | bc -l 2>/dev/null || echo 0) )); then
   docker builder prune -f &>/dev/null || true
 fi
 
-COMPOSE_ARGS=()
-$BUILD  && COMPOSE_ARGS+=(--build)
-$DETACH && COMPOSE_ARGS+=(-d)
-$AGENT  && COMPOSE_ARGS+=(--profile agent)
+UP_ARGS=()
+$BUILD  && UP_ARGS+=(--build)
+$DETACH && UP_ARGS+=(-d)
 
 run_stack() {
-  if [ ${#SERVICES[@]} -gt 0 ]; then
+  if $AGENT_ONLY; then
+    log "Starting agent only..."
+    docker compose --profile agent up "${UP_ARGS[@]}" agent
+  elif [ ${#SERVICES[@]} -gt 0 ]; then
     log "Starting: ${SERVICES[*]}"
-    docker compose up "${COMPOSE_ARGS[@]}" "${SERVICES[@]}"
+    docker compose up "${UP_ARGS[@]}" "${SERVICES[@]}"
   else
     log "Starting all services..."
-    docker compose up "${COMPOSE_ARGS[@]}"
+    docker compose up "${UP_ARGS[@]}"
   fi
 }
 
