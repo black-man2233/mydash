@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Waits for SQL Server, creates the database if needed, and applies table scripts.
+# Waits for SQL Server, then publishes the DACPAC (creates DB + applies schema idempotently).
 set -e
 
 SERVER="${DB_SERVER:-db}"
@@ -7,6 +7,7 @@ SA_USER="${DB_USER:-sa}"
 SA_PASS="${DB_PASSWORD:-MyDash_Str0ng!}"
 DB_NAME="${DB_NAME:-MyDash}"
 SQLCMD="/opt/mssql-tools18/bin/sqlcmd"
+DACPAC="/app/MyDash.dacpac"
 
 # ─── wait for SQL Server ──────────────────────────────────────────────────────
 echo "[db-init] Waiting for SQL Server at $SERVER..."
@@ -23,43 +24,20 @@ for i in $(seq 1 40); do
     fi
 done
 
-# ─── create or recover the database ──────────────────────────────────────────
-echo "[db-init] Ensuring database '$DB_NAME' is online..."
-$SQLCMD -S "$SERVER" -U "$SA_USER" -P "$SA_PASS" -C -Q "
--- Create if missing
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'$DB_NAME')
-BEGIN
-    CREATE DATABASE [$DB_NAME];
-    PRINT 'Database created.';
-END
-ELSE
-BEGIN
-    PRINT 'Database already exists.';
-END
-
--- Bring online if in a bad state (emergency, suspect, offline, etc.)
-IF EXISTS (
-    SELECT 1 FROM sys.databases
-    WHERE name = N'$DB_NAME'
-      AND state NOT IN (0, 1) -- 0=ONLINE, 1=RESTORING
-)
-BEGIN
-    PRINT 'Database not online — attempting recovery...';
-    ALTER DATABASE [$DB_NAME] SET ONLINE;
-END
-
--- Ensure multi-user mode
-ALTER DATABASE [$DB_NAME] SET MULTI_USER;
-
--- Ensure READ_WRITE
-ALTER DATABASE [$DB_NAME] SET READ_WRITE;
-"
-
-# ─── apply table scripts ──────────────────────────────────────────────────────
-echo "[db-init] Applying table scripts..."
-for script in /db/tables/*.sql; do
-    echo "[db-init]   -> $script"
-    $SQLCMD -S "$SERVER" -U "$SA_USER" -P "$SA_PASS" -C -d "$DB_NAME" -i "$script"
-done
+# ─── publish DACPAC ───────────────────────────────────────────────────────────
+# SqlPackage creates the database if it doesn't exist, then applies all schema
+# changes from the DACPAC in a diff-based, idempotent way.
+echo "[db-init] Publishing DACPAC to [$DB_NAME] on $SERVER..."
+sqlpackage \
+    /Action:Publish \
+    /SourceFile:"$DACPAC" \
+    /TargetServerName:"$SERVER" \
+    /TargetDatabaseName:"$DB_NAME" \
+    /TargetUser:"$SA_USER" \
+    /TargetPassword:"$SA_PASS" \
+    /TargetTrustServerCertificate:true \
+    /p:BlockOnPossibleDataLoss=false \
+    /p:DropObjectsNotInSource=false \
+    /p:DropIndexesNotInSource=false
 
 echo "[db-init] Schema deployment complete."

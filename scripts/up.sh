@@ -15,17 +15,13 @@ for arg in "$@"; do
   case $arg in
     --no-build)       BUILD=false ;;
     --attach)         DETACH=false ;;
-    --agent|agent)    AGENT=true ;;
+    --agent|agent)    AGENT=true; AGENT_ONLY=true ;;
     --agent-only)     AGENT=true; AGENT_ONLY=true ;;
     --clean)          CLEAN=true ;;
     hub|web|db)       SERVICES+=("$arg") ;;
   esac
 done
 
-# running just "agent" means this machine is an agent-only node — don't start hub/web/db
-[ ${#SERVICES[@]} -eq 0 ] && $AGENT && ! $AGENT_ONLY && \
-  { warn "Tip: use --agent-only to skip hub/web/db on this machine"; }
-$AGENT && [ ${#SERVICES[@]} -eq 0 ] && AGENT_ONLY=true
 
 echo ""
 echo -e "${C}  ███╗   ███╗██╗   ██╗██████╗  █████╗ ███████╗██╗  ██╗${N}"
@@ -50,6 +46,7 @@ $DETACH && UP_ARGS+=(-d)
 run_stack() {
   if $AGENT_ONLY; then
     log "Starting agent only (standalone)..."
+    export MYDASH_NAME="${MYDASH_NAME:-${HOSTNAME}}"
     docker compose -f agent/compose.yml up "${UP_ARGS[@]}"
   elif [ ${#SERVICES[@]} -gt 0 ]; then
     log "Starting: ${SERVICES[*]}"

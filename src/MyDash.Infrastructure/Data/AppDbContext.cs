@@ -50,7 +50,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserPreferences>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasData(new UserPreferences { });
         });
     }
 }

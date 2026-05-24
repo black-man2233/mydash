@@ -20,11 +20,11 @@ services:
       retries: 12
       start_period: 30s
 
-  # ─── Schema init (runs once, exits 0 on success) ──────────────────────────
+  # ─── Schema init: builds DACPAC then publishes via SqlPackage ────────────────
   db-init:
     build:
-      context: ./db
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: db/Dockerfile
     depends_on:
       db:
         condition: service_healthy

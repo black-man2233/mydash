@@ -25,6 +25,9 @@ public class AgentWorker : BackgroundService
     private readonly ServiceDiscovery _discovery;
     private string? _serverId;
 
+    // Tracks previous /proc/stat snapshot for delta CPU calculation
+    private (long total, long idle) _prevCpu = ReadCpuStats();
+
     public AgentWorker(ILogger<AgentWorker> logger, IOptions<AgentOptions> opts, ServiceDiscovery discovery)
     {
         _logger = logger;
@@ -128,44 +131,88 @@ public class AgentWorker : BackgroundService
         await heartbeatTask;
     }
 
-    private static Heartbeat BuildHeartbeat(string serverId)
+    private Heartbeat BuildHeartbeat(string serverId)
     {
         return new Heartbeat
         {
             ServerId = serverId,
-            CpuPercent = GetCpuEstimate(),
-            MemPercent = GetMemEstimate(),
-            DiskPercent = GetDiskEstimate(),
+            CpuPercent = GetCpuPercent(),
+            MemPercent = GetMemPercent(),
+            DiskPercent = GetDiskPercent(),
             UptimeSeconds = GetUptime(),
             Version = "0.1.0",
         };
     }
 
-    private static double GetCpuEstimate()
+    // ─── System metrics ───────────────────────────────────────────────────────
+
+    private double GetCpuPercent()
     {
-        try { return Environment.ProcessorCount > 0 ? Random.Shared.NextDouble() * 30 : 0; }
-        catch { return 0; }
+        try
+        {
+            var current = ReadCpuStats();
+            var dTotal = current.total - _prevCpu.total;
+            var dIdle  = current.idle  - _prevCpu.idle;
+            _prevCpu = current;
+            return dTotal > 0 ? Math.Round((1.0 - (double)dIdle / dTotal) * 100.0, 1) : 0.0;
+        }
+        catch { return 0.0; }
     }
 
-    private static double GetMemEstimate()
+    private static (long total, long idle) ReadCpuStats()
     {
-        try { return Random.Shared.NextDouble() * 60 + 20; }
-        catch { return 0; }
+        // /proc/stat first line: "cpu user nice system idle iowait irq softirq steal ..."
+        var line  = File.ReadLines("/proc/stat").First();
+        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(long.Parse).ToArray();
+        var idle  = parts[3] + parts[4]; // idle + iowait
+        var total = parts.Sum();
+        return (total, idle);
     }
 
-    private static double GetDiskEstimate()
+    private static double GetMemPercent()
+    {
+        try
+        {
+            long memTotal = 0, memAvailable = 0;
+            foreach (var line in File.ReadLines("/proc/meminfo"))
+            {
+                if (line.StartsWith("MemTotal:"))
+                    memTotal = ParseKbLine(line);
+                else if (line.StartsWith("MemAvailable:"))
+                    memAvailable = ParseKbLine(line);
+                if (memTotal > 0 && memAvailable > 0) break;
+            }
+            return memTotal > 0 ? Math.Round((1.0 - (double)memAvailable / memTotal) * 100.0, 1) : 0.0;
+        }
+        catch { return 0.0; }
+    }
+
+    private static long ParseKbLine(string line)
+    {
+        var value = line.Split(':')[1].Trim().Split(' ')[0];
+        return long.TryParse(value, out var v) ? v : 0;
+    }
+
+    private static double GetDiskPercent()
     {
         try
         {
             var root = new DriveInfo(Path.GetPathRoot(Environment.CurrentDirectory) ?? "/");
-            return (1.0 - (double)root.AvailableFreeSpace / root.TotalSize) * 100;
+            return Math.Round((1.0 - (double)root.AvailableFreeSpace / root.TotalSize) * 100.0, 1);
         }
-        catch { return 0; }
+        catch { return 0.0; }
     }
 
     private static long GetUptime()
     {
-        try { return (long)Environment.TickCount64 / 1000; }
-        catch { return 0; }
+        try
+        {
+            // /proc/uptime: "seconds_up idle_seconds"
+            var line = File.ReadLines("/proc/uptime").First();
+            var secs = line.Split(' ')[0];
+            return double.TryParse(secs, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var d) ? (long)d : 0;
+        }
+        catch { return (long)(Environment.TickCount64 / 1000); }
     }
 }
